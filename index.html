@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>资金选股策略 v4</title>
+<style>
+  :root {
+    --bg: #0f1117; --card: #1a1d27; --border: #2a2d3e;
+    --accent: #4f8ef7; --accent2: #7c5cbf;
+    --green: #34d399; --red: #f87171; --yellow: #fbbf24;
+    --text: #e2e8f0; --muted: #64748b;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'SF Pro Display','Segoe UI',system-ui,sans-serif; min-height: 100vh; }
+
+  .header { background: linear-gradient(135deg,#1a1d27,#16213e); border-bottom: 1px solid var(--border); padding: 20px 32px; display: flex; align-items: center; gap: 16px; }
+  .header-icon { font-size: 32px; }
+  .header-title { font-size: 22px; font-weight: 700; background: linear-gradient(90deg,#4f8ef7,#7c5cbf); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .header-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+  .main { max-width: 1400px; margin: 0 auto; padding: 24px; }
+
+  /* ── 顶部 Tab ── */
+  .tab-bar { display: flex; gap: 4px; margin-bottom: 20px; background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 6px; width: fit-content; }
+  .tab-btn { padding: 10px 24px; border-radius: 10px; border: none; background: transparent; color: var(--muted); font-size: 14px; font-weight: 600; cursor: pointer; transition: all .2s; }
+  .tab-btn.active { background: linear-gradient(135deg,#4f8ef7,#7c5cbf); color: #fff; }
+  .tab-pane { display: none; }
+  .tab-pane.active { display: block; }
+
+  /* ── 卡片 ── */
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 24px; margin-bottom: 20px; }
+  .card-title { font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 20px; }
+
+  /* ── 表单 ── */
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+  @media(max-width:768px){ .form-grid { grid-template-columns: 1fr; } }
+  .form-group label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 8px; font-weight: 500; }
+  .form-group input, .form-group textarea {
+    width: 100%; background: #0f1117; border: 1px solid var(--border); border-radius: 10px;
+    padding: 12px 16px; color: var(--text); font-size: 14px; outline: none; transition: border-color .2s;
+  }
+  .form-group textarea { resize: vertical; min-height: 80px; font-family: monospace; }
+  .form-group input:focus, .form-group textarea:focus { border-color: var(--accent); }
+  .form-group input::placeholder, .form-group textarea::placeholder { color: var(--muted); }
+
+  /* ── 策略选择器 ── */
+  .strategy-section { margin-bottom: 20px; }
+  .strategy-section-label { font-size: 12px; color: var(--muted); font-weight: 500; margin-bottom: 10px; }
+  .strategy-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; }
+  .strategy-card {
+    border: 2px solid var(--border); border-radius: 12px; padding: 14px 16px;
+    cursor: pointer; transition: all .2s; position: relative; user-select: none;
+  }
+  .strategy-card:hover { border-color: var(--accent); background: rgba(79,142,247,.04); }
+  .strategy-card.selected { border-color: var(--accent); background: rgba(79,142,247,.08); }
+  .strategy-card.selected::after {
+    content: "✓"; position: absolute; top: 10px; right: 12px;
+    width: 20px; height: 20px; background: var(--accent); border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 700; color: #fff;
+    display: grid; place-items: center;
+  }
+  .strategy-name { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+  .strategy-desc { font-size: 12px; color: var(--muted); line-height: 1.5; }
+  .strategy-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+  .strategy-tag { padding: 2px 7px; background: rgba(79,142,247,.1); border-radius: 4px; font-size: 10px; color: #93c5fd; }
+  .strategy-loading { color: var(--muted); font-size: 13px; padding: 20px 0; }
+
+  /* ── 按钮 ── */
+  .btn-run { margin-top: 20px; width: 100%; padding: 14px; background: linear-gradient(135deg,#4f8ef7,#7c5cbf); border: none; border-radius: 12px; color: #fff; font-size: 16px; font-weight: 600; cursor: pointer; transition: opacity .2s; }
+  .btn-run:hover { opacity: .9; }
+  .btn-run:disabled { opacity: .5; cursor: not-allowed; }
+
+  /* ── 日志 ── */
+  .log-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .log-body { background: #0a0c12; border-radius: 10px; padding: 16px; height: 240px; overflow-y: auto; font-family: monospace; font-size: 12.5px; line-height: 1.8; }
+  .log-line { color: #94a3b8; }
+  .log-ok   { color: var(--green); }
+  .log-err  { color: var(--red); }
+  .log-tip  { color: var(--yellow); }
+  .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin .7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── 结果 ── */
+  .result-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+  .btn-excel { padding: 10px 20px; background: #166534; border: 1px solid #15803d; border-radius: 10px; color: #86efac; font-size: 13px; font-weight: 600; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
+  .btn-excel:hover { background: #15803d; }
+  .btn-excel:disabled { opacity: .5; cursor: not-allowed; }
+  .table-wrap { overflow-x: auto; margin-top: 16px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead th { background: #12151f; color: var(--muted); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .5px; padding: 12px 14px; text-align: center; white-space: nowrap; border-bottom: 1px solid var(--border); }
+  tbody tr { border-bottom: 1px solid #1e2130; }
+  tbody tr:hover { background: #1e2130; }
+  tbody td { padding: 11px 14px; text-align: center; white-space: nowrap; }
+  .td-code { font-family: monospace; font-weight: 600; color: var(--accent); }
+  .td-name { text-align: left; font-weight: 500; }
+  .up { color: #f87171; font-weight: 600; }
+  .dn { color: #34d399; font-weight: 600; }
+  .badge { display: inline-block; min-width: 44px; padding: 3px 10px; border-radius: 20px; font-weight: 700; }
+  .b5 { background: rgba(52,211,153,.15); color: #34d399; }
+  .b4 { background: rgba(56,189,248,.15); color: #38bdf8; }
+  .b3 { background: rgba(251,191,36,.15); color: #fbbf24; }
+  .b2 { background: rgba(251,146,60,.15); color: #fb923c; }
+  .b1 { background: rgba(248,113,113,.15); color: #f87171; }
+  .tag  { display: inline-block; padding: 2px 7px; border-radius: 5px; font-size: 11px; background: rgba(79,142,247,.12); color: #93c5fd; margin: 1px; }
+  .tag-r { background: rgba(248,113,113,.1); color: #fca5a5; }
+  .dir-s { color: #34d399; font-weight: 600; }
+  .dir-o { color: #38bdf8; }
+  .dir-w { color: var(--muted); }
+  .dir-c { color: #fb923c; }
+  .dir-d { color: #f87171; font-weight: 600; }
+  .empty { text-align: center; padding: 60px; color: var(--muted); }
+  .empty-icon { font-size: 48px; margin-bottom: 12px; }
+
+  /* ── 单股输入 ── */
+  .im-tab-bar { display: flex; gap: 6px; margin-bottom: 16px; }
+  .im-tab { padding: 7px 16px; border-radius: 8px; border: 1px solid var(--border); background: transparent; color: var(--muted); font-size: 13px; cursor: pointer; transition: all .2s; }
+  .im-tab.active { border-color: var(--accent); color: var(--accent); background: rgba(79,142,247,.08); }
+  .im-pane { display: none; }
+  .im-pane.active { display: block; }
+  .drop-zone { border: 2px dashed var(--border); border-radius: 12px; padding: 32px; text-align: center; cursor: pointer; transition: all .2s; position: relative; }
+  .drop-zone:hover, .drop-zone.dragover { border-color: var(--accent); background: rgba(79,142,247,.05); }
+  .drop-zone input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+  .drop-zone-icon { font-size: 36px; margin-bottom: 8px; }
+  .drop-zone-text { color: var(--muted); font-size: 13px; }
+  .drop-zone-text strong { color: var(--accent); }
+  #imgPreview { max-width: 100%; max-height: 200px; border-radius: 8px; margin-top: 12px; display: none; }
+  .ocr-result { margin-top: 12px; padding: 12px; background: #0a0c12; border-radius: 8px; font-size: 13px; display: none; }
+  .code-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; min-height: 32px; }
+  .code-tag { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; background: rgba(79,142,247,.12); border: 1px solid rgba(79,142,247,.3); border-radius: 20px; font-size: 12px; color: #93c5fd; font-family: monospace; }
+  .code-tag .rm { cursor: pointer; color: var(--muted); font-size: 14px; }
+  .code-tag .rm:hover { color: var(--red); }
+
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-icon">📊</div>
+  <div>
+    <div class="header-title">资金选股策略 v4</div>
+    <div class="header-sub">Tushare 稳定版 · 策略插件化 · 18分项资金流向深度评分</div>
+  </div>
+</div>
+
+<div class="main">
+
+  <div class="tab-bar">
+    <button class="tab-btn active" onclick="switchTab('screener')">🔍 全市场选股</button>
+    <button class="tab-btn" onclick="switchTab('single')">🎯 单股资金流向分析</button>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       TAB 1：全市场选股
+  ══════════════════════════════════════════ -->
+  <div class="tab-pane active" id="pane-screener">
+
+    <div class="card">
+      <div class="card-title">📋 参数配置</div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>🔑 Tushare Token <span style="color:#f87171">*</span></label>
+          <input id="iToken" type="password" placeholder="登录 tushare.pro → 右上角 → 接口Token" />
+        </div>
+        <div class="form-group">
+          <label>📅 分析日期（留空=今日）</label>
+          <input id="iDate" type="text" placeholder="例：20250325 或 2025-03-25" />
+        </div>
+        <div class="form-group">
+          <label>🌐 代理地址（无需则留空）</label>
+          <input id="iProxy" type="text" placeholder="例：http://127.0.0.1:7897" />
+        </div>
+      </div>
+
+      <!-- 策略选择 -->
+      <div class="strategy-section" style="margin-top:20px;">
+        <div class="strategy-section-label">🧠 选择选股策略（点击选择，可随时切换）</div>
+        <div class="strategy-grid" id="strategyGrid">
+          <div class="strategy-loading">⏳ 正在加载策略列表...</div>
+        </div>
+      </div>
+
+      <button class="btn-run" id="btnRun" onclick="startRun()">🚀 开始选股分析</button>
+    </div>
+
+    <div class="card hidden" id="logCard">
+      <div class="log-header">
+        <div class="card-title" style="margin:0">📟 运行日志</div>
+        <div id="spinner" class="spinner"></div>
+      </div>
+      <div class="log-body" id="logBody"></div>
+    </div>
+
+    <div class="card hidden" id="resultCard">
+      <div class="result-header">
+        <div id="resultInfo" style="font-size:14px;font-weight:600;"></div>
+        <a id="btnExcel" href="#" class="btn-excel hidden" disabled>⏳ 生成中...</a>
+      </div>
+      <div class="table-wrap"><table>
+        <thead><tr>
+          <th>#</th><th>代码</th><th>名称</th>
+          <th>现价</th><th>涨幅%</th><th>量比</th><th>换手%</th><th>市值(亿)</th>
+          <th>量价分</th><th>资金总分</th><th>评级</th><th>方向预判</th><th>行为模式</th>
+          <th>连续流入</th><th>近3日占比%</th><th>5日净额(万)</th>
+          <th>惩罚系数</th><th>看涨依据</th><th>风险提示</th>
+        </tr></thead>
+        <tbody id="tbody"></tbody>
+      </table></div>
+    </div>
+
+  </div><!-- /pane-screener -->
+
+
+  <!-- ══════════════════════════════════════════
+       TAB 2：单股资金流向分析
+  ══════════════════════════════════════════ -->
+  <div class="tab-pane" id="pane-single">
+
+    <div class="card">
+      <div class="card-title">📋 全局参数</div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>🔑 Tushare Token <span style="color:#f87171">*</span></label>
+          <input id="sToken" type="password" placeholder="同全市场选股，填一次即可复用" />
+        </div>
+        <div class="form-group">
+          <label>📅 分析日期（留空=今日）</label>
+          <input id="sDate" type="text" placeholder="例：20250325 或 2025-03-25" />
+        </div>
+        <div class="form-group">
+          <label>🌐 代理地址（无需则留空）</label>
+          <input id="sProxy" type="text" placeholder="例：http://127.0.0.1:7897" />
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">📥 股票代码输入</div>
+      <div class="im-tab-bar">
+        <button class="im-tab active" onclick="switchIM('manual')">✏️ 手动输入</button>
+        <button class="im-tab" onclick="switchIM('image')">🖼️ 图片识别</button>
+        <button class="im-tab" onclick="switchIM('excel')">📊 Excel上传</button>
+      </div>
+
+      <div class="im-pane active" id="im-manual">
+        <div class="form-group">
+          <label>输入股票代码（6位数字），多个用逗号/空格/换行分隔</label>
+          <textarea id="manualCodes" placeholder="例：000001, 600519&#10;002594 300750"></textarea>
+        </div>
+        <button style="margin-top:8px;padding:7px 16px;border-radius:8px;border:1px solid var(--accent);background:transparent;color:var(--accent);font-size:13px;cursor:pointer;" onclick="parseManualCodes()">解析代码 →</button>
+      </div>
+
+      <div class="im-pane" id="im-image">
+        <div class="drop-zone" id="imgDrop" ondragover="event.preventDefault();this.classList.add('dragover')" ondragleave="this.classList.remove('dragover')" ondrop="handleImgDrop(event)">
+          <input type="file" accept="image/*" id="imgFile" onchange="handleImgFile(this)" />
+          <div class="drop-zone-icon">🖼️</div>
+          <div class="drop-zone-text">拖拽截图到此处，或 <strong>点击选择图片</strong><br><span style="font-size:11px;display:block;margin-top:4px">支持任意含股票代码的截图</span></div>
+          <img id="imgPreview" />
+        </div>
+        <div class="ocr-result" id="ocrResult"></div>
+        <div style="margin-top:10px;display:flex;gap:8px;">
+          <button style="padding:7px 16px;border-radius:8px;border:1px solid var(--accent);background:transparent;color:var(--accent);font-size:13px;cursor:pointer;" id="btnOcr" onclick="runOCR()" disabled>🔍 识别股票代码</button>
+          <span style="font-size:12px;color:var(--muted);align-self:center">识别后可手动编辑代码列表</span>
+        </div>
+      </div>
+
+      <div class="im-pane" id="im-excel">
+        <div class="drop-zone" id="xlsDrop" ondragover="event.preventDefault();this.classList.add('dragover')" ondragleave="this.classList.remove('dragover')" ondrop="handleXlsDrop(event)">
+          <input type="file" accept=".xlsx,.xls,.csv" id="xlsFile" onchange="handleXlsFile(this)" />
+          <div class="drop-zone-icon">📊</div>
+          <div class="drop-zone-text">拖拽 Excel/CSV 文件，或 <strong>点击选择文件</strong><br><span style="font-size:11px;display:block;margin-top:4px">自动识别文件中所有6位股票代码</span></div>
+        </div>
+        <div id="xlsPreview" style="margin-top:8px;font-size:12px;color:var(--muted);"></div>
+      </div>
+
+      <div style="margin-top:20px;">
+        <div style="font-size:12px;color:var(--muted);margin-bottom:8px;">已解析股票代码 <span id="codeCount" style="color:var(--accent)">0</span> 只：</div>
+        <div class="code-tags" id="codeTags"></div>
+        <button style="margin-top:10px;padding:5px 12px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);font-size:12px;cursor:pointer;" onclick="clearCodes()">清空</button>
+      </div>
+    </div>
+
+    <button class="btn-run" id="sBtnRun" onclick="startSingleRun()">🎯 开始资金流向分析</button>
+
+    <div class="card hidden" id="sLogCard">
+      <div class="log-header">
+        <div class="card-title" style="margin:0">📟 运行日志</div>
+        <div id="sSpinner" class="spinner"></div>
+      </div>
+      <div class="log-body" id="sLogBody"></div>
+    </div>
+
+    <div class="card hidden" id="sResultCard">
+      <div class="result-header">
+        <div id="sResultInfo" style="font-size:14px;font-weight:600;"></div>
+        <a id="sBtnExcel" href="#" class="btn-excel hidden" disabled>⏳ 生成中...</a>
+      </div>
+      <div class="table-wrap"><table>
+        <thead><tr>
+          <th>#</th><th>代码</th><th>名称</th>
+          <th>现价</th><th>涨幅%</th><th>量比</th><th>换手%</th><th>市值(亿)</th>
+          <th>量价分</th><th>资金总分</th><th>评级</th><th>方向预判</th><th>行为模式</th>
+          <th>连续流入</th><th>近3日占比%</th><th>5日净额(万)</th>
+          <th>惩罚系数</th><th>看涨依据</th><th>风险提示</th>
+        </tr></thead>
+        <tbody id="sTbody"></tbody>
+      </table></div>
+    </div>
+
+  </div><!-- /pane-single -->
+
+</div>
+
+<script>
+// ═══════════════════════════ Tab 切换 ═══════════════════════════
+function switchTab(name) {
+  document.querySelectorAll('.tab-btn').forEach((b,i)=>b.classList.toggle('active',['screener','single'][i]===name));
+  document.querySelectorAll('.tab-pane').forEach(p=>p.classList.remove('active'));
+  document.getElementById('pane-'+name).classList.add('active');
+}
+
+// ═══════════════════════════ 策略加载 ════════════════════════════
+let _selectedStrategy = null;
+
+async function loadStrategies() {
+  const grid = document.getElementById('strategyGrid');
+  try {
+    const resp = await fetch('/api/strategies');
+    const data = await resp.json();
+    const list = data.strategies || [];
+    if (!list.length) {
+      grid.innerHTML = '<div style="color:var(--red);font-size:13px">⚠️ 未找到任何策略，请确认 strategies/ 目录下有策略文件</div>';
+      return;
+    }
+    grid.innerHTML = '';
+    list.forEach((s, idx) => {
+      const div = document.createElement('div');
+      div.className = 'strategy-card' + (idx === 0 ? ' selected' : '');
+      div.dataset.id = s.id;
+      div.innerHTML = `
+        <div class="strategy-name">${s.name}</div>
+        <div class="strategy-desc">${s.description}</div>
+        <div class="strategy-tags">${(s.tags||[]).map(t=>`<span class="strategy-tag">${t}</span>`).join('')}</div>
+      `;
+      div.onclick = () => selectStrategy(s.id);
+      grid.appendChild(div);
+      if (idx === 0) _selectedStrategy = s.id;
+    });
+  } catch(e) {
+    grid.innerHTML = `<div style="color:var(--red);font-size:13px">❌ 加载策略失败：${e.message}</div>`;
+  }
+}
+
+function selectStrategy(id) {
+  _selectedStrategy = id;
+  document.querySelectorAll('.strategy-card').forEach(c => {
+    c.classList.toggle('selected', c.dataset.id === id);
+  });
+}
+
+loadStrategies();
+
+// ═══════════════════════════ TAB 1 全市场选股 ════════════════════
+let _taskId=null, _timer=null, _excelTimer=null, _logIdx=0, _excelRetries=0;
+const MAX_RETRIES = 30;
+
+function startRun() {
+  const token = document.getElementById('iToken').value.trim();
+  const date  = document.getElementById('iDate').value.trim();
+  const proxy = document.getElementById('iProxy').value.trim();
+  if (!token) { alert('请填写 Tushare Token'); return; }
+  if (!_selectedStrategy) { alert('请选择一个选股策略'); return; }
+  if (_timer) clearInterval(_timer);
+  if (_excelTimer) clearInterval(_excelTimer);
+  _excelRetries = 0;
+  document.getElementById('btnRun').disabled = true;
+  document.getElementById('btnRun').textContent = '⏳ 运行中...';
+  show('logCard'); hide('resultCard');
+  document.getElementById('logBody').innerHTML = '';
+  document.getElementById('spinner').style.display = 'inline-block';
+  _logIdx = 0;
+
+  fetch('/api/run', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({token, date, proxy, strategy_id: _selectedStrategy})
+  })
+  .then(r=>r.json())
+  .then(d=>{
+    if (d.error) { addLog('❌ '+d.error,'log-err','logBody'); resetBtn(); return; }
+    _taskId = d.task_id;
+    _timer = setInterval(poll, 1500);
+  })
+  .catch(e=>{ addLog('❌ '+e,'log-err','logBody'); resetBtn(); });
+}
+
+function poll() {
+  fetch('/api/status/'+_taskId).then(r=>r.json()).then(d=>{
+    d.log.slice(_logIdx).forEach(m=>addLog(m,logClass(m),'logBody'));
+    _logIdx = d.log.length;
+    if (d.status==='done') {
+      clearInterval(_timer);
+      document.getElementById('spinner').style.display='none';
+      if (d.has_result) { loadResult(); startExcelPolling('btnExcel',_taskId); } else resetBtn();
+    } else if (d.status==='error') {
+      clearInterval(_timer);
+      document.getElementById('spinner').style.display='none';
+      resetBtn();
+    }
+  }).catch(()=>{});
+}
+
+function loadResult() {
+  fetch('/api/result/'+_taskId).then(r=>r.json()).then(d=>{
+    const rows = d.result||[];
+    document.getElementById('resultInfo').textContent = `✅ 共筛出 ${rows.length} 只股票`;
+    renderTable(rows,'tbody');
+    show('resultCard'); resetBtn();
+  }).catch(e=>{ addLog('❌ 加载失败:'+e,'log-err','logBody'); resetBtn(); });
+}
+
+function resetBtn() {
+  const b = document.getElementById('btnRun');
+  b.disabled=false; b.textContent='🚀 开始选股分析';
+}
+
+// ═══════════════════════════ TAB 2 单股 ══════════════════════════
+let _sParsedCodes=[], _sTaskId=null, _sTimer=null, _sExcelTimer=null, _sLogIdx=0, _sExcelRetries=0;
+let _imgBase64=null;
+
+function switchIM(name) {
+  document.querySelectorAll('.im-tab').forEach((b,i)=>b.classList.toggle('active',['manual','image','excel'][i]===name));
+  document.querySelectorAll('.im-pane').forEach(p=>p.classList.remove('active'));
+  document.getElementById('im-'+name).classList.add('active');
+}
+
+function parseManualCodes() {
+  const raw = document.getElementById('manualCodes').value;
+  addCodes((raw.match(/\b\d{6}\b/g)||[]));
+}
+
+function handleImgFile(input) { if(input.files[0]) loadImageFile(input.files[0]); }
+function handleImgDrop(e) {
+  e.preventDefault();
+  document.getElementById('imgDrop').classList.remove('dragover');
+  const f=e.dataTransfer.files[0];
+  if(f&&f.type.startsWith('image/')) loadImageFile(f);
+}
+function loadImageFile(file) {
+  const reader=new FileReader();
+  reader.onload=e=>{
+    _imgBase64=e.target.result.split(',')[1];
+    const p=document.getElementById('imgPreview');
+    p.src=e.target.result; p.style.display='block';
+    document.getElementById('btnOcr').disabled=false;
+    document.getElementById('ocrResult').style.display='none';
+  };
+  reader.readAsDataURL(file);
+}
+async function runOCR() {
+  if(!_imgBase64) return;
+  const btn=document.getElementById('btnOcr');
+  btn.disabled=true; btn.textContent='🔄 识别中...';
+  const div=document.getElementById('ocrResult');
+  div.style.display='block'; div.style.color='var(--muted)'; div.textContent='正在调用 AI 识别...';
+  try {
+    const resp=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        model:'claude-sonnet-4-20250514', max_tokens:500,
+        messages:[{role:'user',content:[
+          {type:'image',source:{type:'base64',media_type:'image/jpeg',data:_imgBase64}},
+          {type:'text',text:'请从这张图片中识别所有A股股票代码（6位数字，以0、3、6开头）。只输出找到的代码，用逗号分隔，不要任何其他文字。如果没有找到股票代码，输出：无'}
+        ]}]
+      })
+    });
+    const data=await resp.json();
+    const text=(data.content||[]).map(c=>c.text||'').join('');
+    const codes=(text.match(/\b\d{6}\b/g)||[]);
+    const uniq=[...new Set(codes)];
+    if(!uniq.length){
+      div.style.color='var(--red)'; div.textContent='❌ 未识别到股票代码';
+    } else {
+      div.style.color='var(--green)'; div.textContent=`✅ 识别到 ${uniq.length} 个：${uniq.join(', ')}`;
+      addCodes(uniq);
+    }
+  } catch(e) {
+    div.style.color='var(--red)'; div.textContent='❌ 识别失败：'+e.message;
+  }
+  btn.disabled=false; btn.textContent='🔍 识别股票代码';
+}
+
+function handleXlsFile(input) { if(input.files[0]) parseXlsFile(input.files[0]); }
+function handleXlsDrop(e) {
+  e.preventDefault();
+  document.getElementById('xlsDrop').classList.remove('dragover');
+  if(e.dataTransfer.files[0]) parseXlsFile(e.dataTransfer.files[0]);
+}
+function parseXlsFile(file) {
+  const prev=document.getElementById('xlsPreview');
+  prev.textContent='解析中...';
+  const reader=new FileReader();
+  if(file.name.endsWith('.csv')) {
+    reader.onload=e=>{
+      const codes=(e.target.result.match(/\b[036]\d{5}\b/g)||[]);
+      const uniq=[...new Set(codes)];
+      prev.textContent=`找到 ${uniq.length} 个代码`;
+      addCodes(uniq);
+    };
+    reader.readAsText(file,'utf-8');
+  } else {
+    reader.onload=e=>{
+      const arr=new Uint8Array(e.target.result);
+      let str='';
+      const limit=Math.min(arr.length,512000);
+      for(let i=0;i<limit;i++) str+=arr[i]>=32&&arr[i]<127?String.fromCharCode(arr[i]):' ';
+      const codes=(str.match(/\b[036]\d{5}\b/g)||[]);
+      const uniq=[...new Set(codes)];
+      prev.textContent=`找到 ${uniq.length} 个代码`;
+      addCodes(uniq);
+    };
+    reader.readAsArrayBuffer(file);
+  }
+}
+
+function addCodes(newCodes) {
+  const s=new Set(_sParsedCodes);
+  newCodes.forEach(c=>{ if(/^\d{6}$/.test(c)) s.add(c); });
+  _sParsedCodes=[...s]; renderCodeTags();
+}
+function removeCode(c) { _sParsedCodes=_sParsedCodes.filter(x=>x!==c); renderCodeTags(); }
+function clearCodes() { _sParsedCodes=[]; renderCodeTags(); }
+function renderCodeTags() {
+  document.getElementById('codeCount').textContent=_sParsedCodes.length;
+  document.getElementById('codeTags').innerHTML=_sParsedCodes.map(c=>`
+    <span class="code-tag">${c}<span class="rm" onclick="removeCode('${c}')">×</span></span>`).join('');
+}
+
+function startSingleRun() {
+  const token=document.getElementById('sToken').value.trim();
+  const date=document.getElementById('sDate').value.trim();
+  const proxy=document.getElementById('sProxy').value.trim();
+  if(!token){alert('请填写 Tushare Token');return;}
+  if(!_sParsedCodes.length){alert('请先添加至少一只股票代码');return;}
+  if(_sTimer) clearInterval(_sTimer);
+  if(_sExcelTimer) clearInterval(_sExcelTimer);
+  _sExcelRetries=0;
+  document.getElementById('sBtnRun').disabled=true;
+  document.getElementById('sBtnRun').textContent='⏳ 分析中...';
+  show('sLogCard'); hide('sResultCard');
+  document.getElementById('sLogBody').innerHTML='';
+  document.getElementById('sSpinner').style.display='inline-block';
+  _sLogIdx=0;
+  fetch('/api/run_single',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({token,date,proxy,codes:_sParsedCodes})
+  }).then(r=>r.json()).then(d=>{
+    if(d.error){addLog('❌ '+d.error,'log-err','sLogBody');resetSBtn();return;}
+    _sTaskId=d.task_id;
+    _sTimer=setInterval(pollSingle,1500);
+  }).catch(e=>{addLog('❌ '+e,'log-err','sLogBody');resetSBtn();});
+}
+function pollSingle() {
+  fetch('/api/status/'+_sTaskId).then(r=>r.json()).then(d=>{
+    d.log.slice(_sLogIdx).forEach(m=>addLog(m,logClass(m),'sLogBody'));
+    _sLogIdx=d.log.length;
+    if(d.status==='done'){
+      clearInterval(_sTimer);
+      document.getElementById('sSpinner').style.display='none';
+      if(d.has_result){loadSingleResult();startExcelPolling('sBtnExcel',_sTaskId);}else resetSBtn();
+    } else if(d.status==='error'){
+      clearInterval(_sTimer);
+      document.getElementById('sSpinner').style.display='none';
+      resetSBtn();
+    }
+  }).catch(()=>{});
+}
+function loadSingleResult() {
+  fetch('/api/result/'+_sTaskId).then(r=>r.json()).then(d=>{
+    const rows=d.result||[];
+    document.getElementById('sResultInfo').textContent=`✅ 已分析 ${rows.length} 只股票`;
+    renderTable(rows,'sTbody');
+    show('sResultCard'); resetSBtn();
+  }).catch(e=>{addLog('❌ 失败:'+e,'log-err','sLogBody');resetSBtn();});
+}
+function resetSBtn(){
+  const b=document.getElementById('sBtnRun');
+  b.disabled=false; b.textContent='🎯 开始资金流向分析';
+}
+
+// ═══════════════════════════ Excel 轮询 ══════════════════════════
+function startExcelPolling(btnId, taskId) {
+  const btn=document.getElementById(btnId);
+  btn.classList.remove('hidden'); btn.textContent='⏳ Excel 生成中...';
+  btn.disabled=true; btn.style.pointerEvents='none';
+  let retries=0;
+  const t=setInterval(()=>{
+    fetch(`/api/excel_status/${taskId}`).then(r=>r.json()).then(data=>{
+      if(data.ready){
+        clearInterval(t);
+        btn.href=`/api/excel/${taskId}`;
+        btn.textContent='⬇️ 下载 Excel 报告';
+        btn.disabled=false; btn.style.pointerEvents='auto';
+      } else if(++retries>=MAX_RETRIES){
+        clearInterval(t);
+        btn.textContent='❌ 生成超时'; btn.disabled=true;
+      }
+    }).catch(()=>clearInterval(t));
+  },1000);
+}
+
+// ═══════════════════════════ 公用函数 ════════════════════════════
+function logClass(m){
+  if(m.includes('✅')||m.includes('🎉')) return 'log-ok';
+  if(m.includes('❌')||m.includes('出错')||m.includes('Traceback')) return 'log-err';
+  if(m.includes('📅')||m.includes('⚠️')) return 'log-tip';
+  return 'log-line';
+}
+function renderTable(rows, tbodyId) {
+  const tbody=document.getElementById(tbodyId);
+  tbody.innerHTML='';
+  if(!rows.length){
+    tbody.innerHTML='<tr><td colspan="19"><div class="empty"><div class="empty-icon">🔍</div><div>暂无数据</div></div></td></tr>';
+    return;
+  }
+  rows.forEach((r,i)=>{
+    const pct=r.pct_chg;
+    const pctStr=pct==null?'─':(pct>=0?'+':'')+pct.toFixed(2)+'%';
+    const pctCls=pct==null?'':pct>=0?'up':'dn';
+    const sc=r.total||0;
+    const bcls=sc>=75?'b5':sc>=60?'b4':sc>=45?'b3':sc>=30?'b2':'b1';
+    const stars=sc>=75?'★★★★★':sc>=60?'★★★★☆':sc>=45?'★★★☆☆':sc>=30?'★★☆☆☆':'★☆☆☆☆';
+    const dir=r.direction||'─';
+    const dcls=dir.includes('强势')?'dir-s':dir.includes('积极')?'dir-o':dir.includes('谨慎')?'dir-c':dir.includes('出货')?'dir-d':'dir-w';
+    const ev=(r.evidence||[]).slice(0,2).map(e=>`<span class="tag">${e.substring(0,20)}</span>`).join('');
+    const rk=(r.risk||[]).slice(0,2).map(e=>`<span class="tag tag-r">${e.substring(0,20)}</span>`).join('');
+    const tr=document.createElement('tr');
+    tr.innerHTML=`
+      <td>${i+1}</td><td class="td-code">${r.code||''}</td><td class="td-name">${r.name||''}</td>
+      <td>${r.price!=null?r.price.toFixed(2):'─'}</td>
+      <td class="${pctCls}">${pctStr}</td>
+      <td>${r.vol_ratio!=null?r.vol_ratio.toFixed(2):'─'}</td>
+      <td>${r.turnover!=null?r.turnover.toFixed(2):'─'}</td>
+      <td>${r.circ_cap_yi!=null?r.circ_cap_yi.toFixed(1):'─'}</td>
+      <td>${r.stage1_score||0}/8</td>
+      <td><span class="badge ${bcls}">${sc}</span></td>
+      <td style="color:#fbbf24;font-size:11px">${stars}</td>
+      <td class="${dcls}">${dir}</td>
+      <td>${r.pattern||'─'}</td>
+      <td>${r.consec_in||0}天</td>
+      <td>${r.recent_pct!=null?(r.recent_pct>=0?'+':'')+r.recent_pct.toFixed(2)+'%':'─'}</td>
+      <td>${r.net_5d!=null?Math.round(r.net_5d):'─'}</td>
+      <td>${r.penalty_coef!=null?r.penalty_coef.toFixed(2):'─'}</td>
+      <td style="text-align:left;max-width:180px;white-space:normal">${ev||'─'}</td>
+      <td style="text-align:left;max-width:180px;white-space:normal">${rk||'─'}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+function addLog(msg,cls,targetId){
+  const b=document.getElementById(targetId||'logBody');
+  const d=document.createElement('div');
+  d.className=cls||'log-line'; d.textContent=msg;
+  b.appendChild(d); b.scrollTop=b.scrollHeight;
+}
+function show(id){document.getElementById(id).classList.remove('hidden');}
+function hide(id){document.getElementById(id).classList.add('hidden');}
+</script>
+</body>
+</html>
