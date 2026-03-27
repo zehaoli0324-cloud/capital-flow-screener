@@ -2,7 +2,9 @@ capital-flow-screener
 基于 Tushare 数据源的 A 股选股分析工具，提供多策略筛选 + 资金流向深度评分（18 分项）的 Web 服务。
 ________________________________________
 ✨ 功能特性
-•	多策略插件化：支持主力资金建仓、低位黑马启动、均线多头放量突破、龙虎榜机构游资共振等多种选股策略，可轻松扩展新策略。
+•	多策略插件化：
+•	支持主力资金建仓、低位黑马启动、均线多头放量突破、龙虎榜机构游资共振等多种选股策略，可轻松扩展新策略。
+
 •	两阶段筛选：
 o	第一阶段（量价评分）：通过 8 项量价条件初筛（涨幅、量比、换手、均线形态等），选出前 N 只候选股。
 o	第二阶段（资金流向评分）：对候选股拉取资金流向数据（超大单、大单净额等），结合 K 线衍生指标（CMF、OBV、MFI、VWAP 等）计算综合评分（满分 100 分）。
@@ -20,7 +22,7 @@ ________________________________________
 📦 安装与配置
 1. 克隆仓库
 bash
-git clone https://github.com/你的用户名/capital-flow-screener.git
+git clone https://github.com/zehaoli0324-cloud/capital-flow-screener.git
 cd capital-flow-screener
 2. 安装依赖
 bash
@@ -138,5 +140,5 @@ ________________________________________
 🤝 贡献
 欢迎提交 Issue 和 Pull Request。如果您有更好的策略或评分算法，欢迎分享。
 ________________________________________
-项目地址：https://github.com/你的用户名/capital-flow-screener
+项目地址：https://github.com/zehaoli0324-cloud/capital-flow-screener
 
